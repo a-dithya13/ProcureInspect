@@ -1,0 +1,71 @@
+{
+  "scenarios": [
+    {
+      "name": "convergence_cluster",
+      "description": "Vendors A & B: winner concentration + repeated participation + bid similarity + price deviation on the final award",
+      "vendor_ids": [
+        "V0201",
+        "V0202"
+      ],
+      "tender_ids": [
+        "T0001",
+        "T0002",
+        "T0003",
+        "T0004",
+        "T0005",
+        "T0006"
+      ]
+    },
+    {
+      "name": "standalone_price_deviation",
+      "description": "Single tender awarded far above the IT Services/Oakville peer baseline",
+      "vendor_ids": [
+        "V0206"
+      ],
+      "tender_ids": [
+        "T0017"
+      ]
+    },
+    {
+      "name": "standalone_competition_anomaly",
+      "description": "Tender with a single bidder against a peer group averaging 5-6 bidders",
+      "vendor_ids": [
+        "V0117"
+      ],
+      "tender_ids": [
+        "T0024"
+      ]
+    },
+    {
+      "name": "standalone_winner_concentration",
+      "description": "One vendor wins 6 of 7 comparable Medical Supplies/Fairview tenders",
+      "vendor_ids": [
+        "V0207"
+      ],
+      "tender_ids": [
+        "T0025",
+        "T0026",
+        "T0027",
+        "T0028",
+        "T0029",
+        "T0030",
+        "T0031"
+      ]
+    },
+    {
+      "name": "standalone_participation_and_similarity",
+      "description": "Two vendors repeatedly co-bid with closely-matched amounts, but wins are split (no winner concentration)",
+      "vendor_ids": [
+        "V0211",
+        "V0212"
+      ],
+      "tender_ids": [
+        "T0032",
+        "T0033",
+        "T0034",
+        "T0035",
+        "T0036"
+      ]
+    }
+  ]
+}
