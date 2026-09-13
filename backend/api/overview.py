@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database.db import get_db
-from models.orm import AnalysisRun, Award, Bid, InvestigationCase, RiskSignal, Tender, Vendor
+from models.orm import AnalysisRun, Award, Bid, CaseVendor, InvestigationCase, RiskSignal, Tender, Vendor
 from models.schemas import OverviewOut, PriorityDistribution
 
 router = APIRouter(prefix="/api", tags=["overview"])
@@ -18,6 +18,7 @@ def get_overview(db: Session = Depends(get_db)):
     )
 
     last_run = db.query(AnalysisRun).order_by(AnalysisRun.run_at.desc()).first()
+    vendors_under_review = db.query(func.count(func.distinct(CaseVendor.vendor_id))).scalar() or 0
 
     return OverviewOut(
         total_tenders=db.query(func.count(Tender.id)).scalar() or 0,
@@ -26,6 +27,8 @@ def get_overview(db: Session = Depends(get_db)):
         total_awards=db.query(func.count(Award.id)).scalar() or 0,
         total_signals=db.query(func.count(RiskSignal.id)).scalar() or 0,
         total_cases=db.query(func.count(InvestigationCase.id)).scalar() or 0,
+        high_priority_cases=priority_counts.get("HIGH", 0),
+        vendors_under_review=vendors_under_review,
         priority_distribution=PriorityDistribution(
             HIGH=priority_counts.get("HIGH", 0),
             MEDIUM=priority_counts.get("MEDIUM", 0),

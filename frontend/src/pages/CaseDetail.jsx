@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import OwnerSignalBadge from "../components/OwnerSignalBadge";
 import RelationshipGraph from "../components/RelationshipGraph";
 import SignalCard from "../components/SignalCard";
 import api from "../services/api";
+
+const SIGNAL_LABELS = {
+  PRICE_DEVIATION: "Price Deviation",
+  WINNER_CONCENTRATION: "Winner Concentration",
+  REPEATED_PARTICIPATION: "Repeated Participation",
+  BID_SIMILARITY: "Bid Similarity",
+  COMPETITION_ANOMALY: "Competition Anomaly",
+};
 
 export default function CaseDetail() {
   const { caseId } = useParams();
@@ -32,6 +41,7 @@ export default function CaseDetail() {
   }
 
   const c = caseData;
+  const signalTypes = [...new Set(c.signals.map((s) => s.signal_type))];
 
   return (
     <div>
@@ -41,18 +51,19 @@ export default function CaseDetail() {
         <div>
           <div className="priority-banner-id mono">CASE #{c.id}</div>
           <div className="priority-banner-title">Investigation Priority: {c.priority}</div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Generated {new Date(c.created_at).toLocaleString()}
+          </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div className="stat-label">Priority score</div>
+          <div className="stat-label">Investigation Score</div>
           <div className="stat-value">{c.score.toFixed(1)}</div>
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Entities Involved</h2>
-        </div>
-        <div className="card-body">
+      <div className="case-panel">
+        <section className="case-section">
+          <h2 className="section-title">Entities Involved</h2>
           <div className="entity-chip-list" style={{ marginBottom: 14 }}>
             {c.vendors.map((v) => (
               <Link key={v.id} to={`/vendors/${v.id}`} className="entity-chip">
@@ -63,85 +74,96 @@ export default function CaseDetail() {
           </div>
           <div className="entity-chip-list">
             {c.tenders.map((t) => (
-              <div key={t.id} className="entity-chip">
-                <div><strong className="mono">{t.id}</strong> {t.title}</div>
+              <div key={t.id} className="entity-chip entity-chip-tender">
+                <Link to={`/tenders/${t.id}`}>
+                  <strong className="mono">{t.id}</strong> {t.title}
+                </Link>
                 <div className="entity-chip-sub">
                   {t.department} · {t.category} · {t.location} · est. {t.estimated_value.toLocaleString()}
                 </div>
+                {t.owner_signal && (
+                  <div style={{ marginTop: 6 }}>
+                    <OwnerSignalBadge signal={t.owner_signal} compact />
+                  </div>
+                )}
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 13.5, color: "#475569", marginTop: 14 }}>{c.explanation}</p>
-        </div>
-      </div>
+        </section>
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Signals ({c.signals.length})</h2>
-        </div>
-        <div className="card-body">
-          {c.signals.map((s, i) => (
-            <div key={s.id}>
-              <div className="stat-label" style={{ marginBottom: 6 }}>Signal {i + 1} of {c.signals.length}</div>
-              <SignalCard signal={s} />
+        <section className="case-section">
+          <h2 className="section-title">Why This Case Was Flagged</h2>
+          <div className="case-section-flagged">
+            <p className="flagged-explanation">{c.explanation}</p>
+            <div className="chip-row">
+              {signalTypes.map((t) => (
+                <span key={t} className="badge badge-type badge-type-lg">{SIGNAL_LABELS[t] || t}</span>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        </section>
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Evidence</h2>
-        </div>
-        <div className="card-body">
-          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-            Underlying records used to generate each signal in this case.
-          </p>
-          {c.evidence.map((bundle) => (
-            <div key={bundle.signal_id} style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
-                <span className="mono">{bundle.signal_id}</span> · {bundle.signal_type.replaceAll("_", " ")}
+        <section className="case-section">
+          <h2 className="section-title">Key Findings ({c.signals.length})</h2>
+          {c.signals.length === 0 ? (
+            <div className="empty-state">No investigation signals detected.</div>
+          ) : (
+            c.signals.map((s, i) => (
+              <div key={s.id}>
+                <div className="stat-label" style={{ marginBottom: 6 }}>Finding {i + 1} of {c.signals.length}</div>
+                <SignalCard signal={s} />
               </div>
-              <div className="evidence-table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      {bundle.records[0] &&
-                        Object.keys(bundle.records[0]).map((k) => <th key={k}>{k.replaceAll("_", " ")}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bundle.records.map((r, i) => (
-                      <tr key={i}>
-                        {Object.entries(r).map(([k, v]) => (
-                          <td key={k}>{v === null || v === undefined ? <span className="muted">—</span> : String(v)}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            ))
+          )}
+        </section>
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Vendor / Tender Relationship Graph</h2>
-        </div>
-        <div className="card-body">
-          <RelationshipGraph graph={c.graph} />
-        </div>
-      </div>
+        <section className="case-section">
+          <h2 className="section-title">Related Entities</h2>
+          {c.graph.nodes.length === 0 ? (
+            <div className="empty-state">No related entities found.</div>
+          ) : (
+            <RelationshipGraph graph={c.graph} />
+          )}
+        </section>
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Recommended Investigation Focus</h2>
-        </div>
-        <div className="card-body">
-          <div className="recommendation-box">{c.recommended_investigation}</div>
-        </div>
+        <section className="case-section">
+          <h2 className="section-title">Activity Timeline</h2>
+          <ol className="timeline">
+            {[...c.tenders]
+              .sort((a, b) => new Date(a.date) - new Date(b.date))
+              .map((t) => (
+                <li key={t.id}>
+                  <div className="timeline-date">{t.date}</div>
+                  <div>
+                    Tender <Link to={`/tenders/${t.id}`} className="evidence-id">{t.id}</Link> published
+                    <div className="muted" style={{ fontSize: 12 }}>{t.title}</div>
+                  </div>
+                </li>
+              ))}
+            <li>
+              <div className="timeline-date">{new Date(c.created_at).toLocaleDateString()}</div>
+              <div>Case <span className="mono">{c.id}</span> created from {c.signals.length} converging signal(s)</div>
+            </li>
+          </ol>
+        </section>
+
+        <section className="case-section">
+          <h2 className="section-title">Recommended Investigation Focus</h2>
+          <div className="case-section-focus">
+            <p className="muted" style={{ fontSize: 12.5, marginTop: 0, marginBottom: 12 }}>
+              This is not an autonomous conclusion. It tells the investigator what to verify next.
+            </p>
+            {c.recommended_investigation.length === 0 ? (
+              <div className="empty-state">No specific investigation focus generated for this case.</div>
+            ) : (
+              <ol className="focus-list">
+                {c.recommended_investigation.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </section>
       </div>
 
       <div className="disclaimer">

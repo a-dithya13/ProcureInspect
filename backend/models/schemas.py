@@ -51,6 +51,7 @@ class RiskSignalOut(BaseModel):
     tender_ids: list[str]
     vendor_ids: list[str]
     evidence: list[dict[str, Any]]
+    metrics: dict[str, Any] = {}
 
 
 class CaseSummaryOut(BaseModel):
@@ -59,12 +60,29 @@ class CaseSummaryOut(BaseModel):
     priority: str
     score: float
     status: str
+    created_at: str
     vendor_ids: list[str]
     tender_ids: list[str]
     signal_ids: list[str]
     signal_types: list[str]
     vendor_names: list[str]
+    primary_entity: Optional[str] = None
+    primary_tender: Optional[str] = None
     explanation: str
+
+
+class TenderOwnerSignalOut(BaseModel):
+    """Deterministic rollup of detected activity around a tender-owning
+    department. Describes pattern density, never a finding of misconduct."""
+    name: str
+    tag: str  # HIGH SIGNAL | ELEVATED | LOW SIGNAL | NEUTRAL
+    case_count: int
+    signal_count: int
+    high_signal_count: int
+
+
+class TenderWithOwnerOut(TenderOut):
+    owner_signal: Optional[TenderOwnerSignalOut] = None
 
 
 class GraphNode(BaseModel):
@@ -92,12 +110,13 @@ class CaseDetailOut(BaseModel):
     priority: str
     score: float
     status: str
+    created_at: str
     vendors: list[VendorOut]
-    tenders: list[TenderOut]
+    tenders: list[TenderWithOwnerOut]
     signals: list[RiskSignalOut]
     explanation: str
     evidence: list[dict[str, Any]]
-    recommended_investigation: str
+    recommended_investigation: list[str]
     graph: GraphData
 
 
@@ -105,6 +124,13 @@ class VendorDetailOut(BaseModel):
     vendor: VendorOut
     bids: list[BidOut]
     awards: list[AwardOut]
+    cases: list[CaseSummaryOut]
+
+
+class TenderDetailOut(BaseModel):
+    tender: TenderWithOwnerOut
+    bids: list[BidOut]
+    award: Optional[AwardOut] = None
     cases: list[CaseSummaryOut]
 
 
@@ -121,6 +147,8 @@ class OverviewOut(BaseModel):
     total_awards: int
     total_signals: int
     total_cases: int
+    high_priority_cases: int
+    vendors_under_review: int
     priority_distribution: PriorityDistribution
     last_analysis_run: Optional[str] = None
 

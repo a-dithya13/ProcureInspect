@@ -62,6 +62,12 @@ def detect(tenders_df: pd.DataFrame, bids_df: pd.DataFrame) -> list[dict]:
                 "tender_ids": [row["id"]],
                 "vendor_ids": [],
                 "evidence": evidence,
+                "metrics": {
+                    "observed_bids": current,
+                    "peer_median_bids": round(peer_median, 1),
+                    "difference_percent": round(-(gap / peer_median) * 100, 1) if peer_median else None,
+                    "peer_count": len(peers),
+                },
             })
 
     return signals

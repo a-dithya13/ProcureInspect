@@ -31,7 +31,9 @@ import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
-from database.db import Base, engine  # noqa: E402
+from sqlalchemy import inspect, text  # noqa: E402
+
+from database.db import engine  # noqa: E402
 from models import orm  # noqa: E402,F401
 
 random.seed(42)
@@ -393,9 +395,21 @@ def main():
     print(f"Generated {len(vendors_df)} vendors, {len(tenders_df)} tenders, "
           f"{len(bids_df)} bids, {len(awards_df)} awards.")
 
-    print("Resetting database schema...")
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+    inspector = inspect(engine)
+    if not inspector.has_table("vendors"):
+        raise RuntimeError(
+            "Database schema not found. Run migrations first:\n"
+            "    cd backend && venv\\Scripts\\python.exe -m alembic upgrade head"
+        )
+
+    print("Clearing existing data (schema is managed by Alembic, not recreated here)...")
+    with engine.begin() as conn:
+        # Deletes cascade to bids/awards/risk_signal_*/case_* via FK ON DELETE CASCADE.
+        conn.execute(text("DELETE FROM investigation_cases"))
+        conn.execute(text("DELETE FROM risk_signals"))
+        conn.execute(text("DELETE FROM analysis_runs"))
+        conn.execute(text("DELETE FROM tenders"))
+        conn.execute(text("DELETE FROM vendors"))
 
     print("Loading data into PostgreSQL (this may take a little while)...")
     vendors_df.to_sql("vendors", engine, if_exists="append", index=False, method="multi", chunksize=500)

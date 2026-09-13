@@ -79,6 +79,11 @@ def detect(tenders_df: pd.DataFrame, bids_df: pd.DataFrame) -> list[dict]:
             "tender_ids": [e["tender_id"] for e in per_tender_evidence],
             "vendor_ids": [v1, v2],
             "evidence": per_tender_evidence,
+            "metrics": {
+                "shared_tenders": len(normalized_diffs),
+                "avg_difference_percent": round(mean_diff * 100, 2),
+                "threshold_percent": round(MAX_NORMALIZED_DIFF * 100, 1),
+            },
         })
 
     return signals

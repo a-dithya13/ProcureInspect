@@ -61,6 +61,12 @@ def detect(tenders_df: pd.DataFrame, bids_df: pd.DataFrame, awards_df: pd.DataFr
                 "tender_ids": wins,
                 "vendor_ids": [vendor_id],
                 "evidence": evidence,
+                "metrics": {
+                    "tenders_won": len(wins),
+                    "tenders_participated": len(participated),
+                    "win_rate_percent": round(win_pct * 100, 1),
+                    "threshold_percent": round(WIN_PCT_THRESHOLD * 100, 1),
+                },
             })
 
     return signals

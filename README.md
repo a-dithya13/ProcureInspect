@@ -23,10 +23,11 @@ ProcureLens is an open-source investigative intelligence prototype designed for 
   - [1. Clone Repository](#1-clone-repository)
   - [2. Backend Setup](#2-backend-setup)
   - [3. Environment Configuration](#3-environment-configuration)
-  - [4. Generate Synthetic Dataset](#4-generate-synthetic-dataset)
-  - [5. Launch Backend Server](#5-launch-backend-server)
-  - [6. Launch Frontend Client](#6-launch-frontend-client)
-  - [7. Run Procurement Analysis](#7-run-procurement-analysis)
+  - [4. Run Database Migrations](#4-run-database-migrations)
+  - [5. Generate Synthetic Dataset](#5-generate-synthetic-dataset)
+  - [6. Launch Backend Server](#6-launch-backend-server)
+  - [7. Launch Frontend Client](#7-launch-frontend-client)
+  - [8. Run Procurement Analysis](#8-run-procurement-analysis)
 - [The 5 Anomaly Detectors](#-the-5-anomaly-detectors)
 - [Interactive Demo Walkthrough](#-interactive-demo-walkthrough)
 - [API Overview](#-api-overview)
@@ -66,7 +67,7 @@ ProcureLens is strictly a **decision-support tool** for human investigators:
 | **Frontend** | React 18, Vite, React Router 6, Axios, Recharts, Cytoscape.js |
 | **Backend** | Python 3.12+, FastAPI, Pydantic v2, Uvicorn |
 | **Data & Graph Analytics** | Pandas, NumPy, NetworkX |
-| **Database** | PostgreSQL (hosted on Supabase or local instance) via SQLAlchemy 2 & Psycopg 3 |
+| **Database** | PostgreSQL (hosted on Supabase or local instance) via SQLAlchemy 2 & Psycopg 3, schema managed by **Alembic** |
 
 ---
 
@@ -86,8 +87,11 @@ MHash/
 │   ├── main.py                    # FastAPI entrypoint, CORS setup, router registration
 │   ├── database/
 │   │   └── db.py                  # SQLAlchemy engine & session factory
+│   ├── alembic/
+│   │   ├── env.py                 # Loads DATABASE_URL from .env, targets models/orm.py metadata
+│   │   └── versions/              # 0001 baseline schema -> 0002 FKs + junction tables
 │   ├── models/
-│   │   ├── orm.py                 # PostgreSQL ORM models (Vendor, Tender, Bid, Case, etc.)
+│   │   ├── orm.py                 # PostgreSQL ORM models (FK-linked Vendor/Tender/Bid/Award, junction tables)
 │   │   └── schemas.py             # Pydantic request/response schemas
 │   ├── detection/                 # The 5 Anomaly Detectors
 │   │   ├── common.py              # Shared statistical utilities & severity clampers
@@ -177,9 +181,22 @@ DATABASE_URL=postgresql+psycopg://username:password@hostname:5432/postgres
 
 ---
 
-### 4. Generate Synthetic Dataset
+### 4. Run Database Migrations
 
-Run the generator script to initialize tables and seed ~200 vendors, ~500 tenders, and ~2,000 bids with planted test scenarios:
+Schema is managed by Alembic, not by the app itself. Run this once (and again after pulling any future schema change):
+
+```bash
+# From the backend directory with venv activated:
+python -m alembic upgrade head
+```
+
+This creates `vendors`, `tenders`, `bids`/`awards` (with foreign keys to them), `risk_signals`/`investigation_cases`, and their junction tables (`risk_signal_tenders`, `risk_signal_vendors`, `case_vendors`, `case_tenders`, `case_signals`). See [docs/data-models.md](file:///c:/Users/Atharva%20Joshi/Projects/MHash/docs/data-models.md) for the full schema and migration history.
+
+---
+
+### 5. Generate Synthetic Dataset
+
+Run the generator script to seed ~200 vendors, ~500 tenders, and ~2,000 bids with planted test scenarios. It assumes the schema from step 4 already exists -- it only clears and reloads data, it never creates or drops tables.
 
 **Windows:**
 ```powershell
@@ -195,7 +212,7 @@ python ../scripts/generate_data.py
 
 ---
 
-### 5. Launch Backend Server
+### 6. Launch Backend Server
 
 Start the FastAPI application with Uvicorn:
 
@@ -207,7 +224,7 @@ uvicorn main:app --reload --port 8000
 
 ---
 
-### 6. Launch Frontend Client
+### 7. Launch Frontend Client
 
 Open a new terminal window, navigate to the `frontend/` directory, install packages, and launch Vite:
 
@@ -220,7 +237,7 @@ npm run dev
 
 ---
 
-### 7. Run Procurement Analysis
+### 8. Run Procurement Analysis
 
 1. Open `http://localhost:5173` in your browser.
 2. Click the **"Analyze Procurement"** button on the top right of the dashboard.

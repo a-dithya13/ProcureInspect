@@ -12,7 +12,20 @@ from sqlalchemy.orm import Session
 
 from cases.case_engine import build_cases
 from detection import bid_similarity, competition, participation, price, winner
-from models.orm import AnalysisRun, Award, Bid, InvestigationCase, RiskSignal, Tender, Vendor
+from models.orm import (
+    AnalysisRun,
+    Award,
+    Bid,
+    CaseSignal,
+    CaseTender,
+    CaseVendor,
+    InvestigationCase,
+    RiskSignal,
+    RiskSignalTender,
+    RiskSignalVendor,
+    Tender,
+    Vendor,
+)
 
 
 def _load_dataframes(db: Session):
@@ -43,8 +56,13 @@ def run_analysis(db: Session) -> dict:
         case["id"] = f"C{i:04d}"
 
     # Fresh analysis run: replace prior signals/cases so results stay consistent.
+    # Junction rows (risk_signal_tenders, case_vendors, etc.) cascade-delete
+    # automatically via the FK ON DELETE CASCADE constraints.
     db.query(InvestigationCase).delete()
     db.query(RiskSignal).delete()
+    db.flush()
+
+    analyzed_at = datetime.now(timezone.utc)
 
     db.bulk_insert_mappings(RiskSignal, [
         {
@@ -53,9 +71,8 @@ def run_analysis(db: Session) -> dict:
             "severity": s["severity"],
             "score": s["score"],
             "explanation": s["explanation"],
-            "tender_ids": s["tender_ids"],
-            "vendor_ids": s["vendor_ids"],
             "evidence": s["evidence"],
+            "metrics": s.get("metrics", {}),
         }
         for s in raw_signals
     ])
@@ -66,14 +83,34 @@ def run_analysis(db: Session) -> dict:
             "priority": c["priority"],
             "score": c["score"],
             "status": c["status"],
-            "vendor_ids": c["vendor_ids"],
-            "tender_ids": c["tender_ids"],
-            "signal_ids": c["signal_ids"],
+            "created_at": analyzed_at,
             "explanation": c["explanation"],
             "evidence": c["evidence"],
             "recommended_investigation": c["recommended_investigation"],
         }
         for c in raw_cases
+    ])
+    db.flush()
+
+    db.bulk_insert_mappings(RiskSignalTender, [
+        {"signal_id": s["id"], "tender_id": t}
+        for s in raw_signals for t in set(s["tender_ids"])
+    ])
+    db.bulk_insert_mappings(RiskSignalVendor, [
+        {"signal_id": s["id"], "vendor_id": v}
+        for s in raw_signals for v in set(s["vendor_ids"])
+    ])
+    db.bulk_insert_mappings(CaseVendor, [
+        {"case_id": c["id"], "vendor_id": v}
+        for c in raw_cases for v in set(c["vendor_ids"])
+    ])
+    db.bulk_insert_mappings(CaseTender, [
+        {"case_id": c["id"], "tender_id": t}
+        for c in raw_cases for t in set(c["tender_ids"])
+    ])
+    db.bulk_insert_mappings(CaseSignal, [
+        {"case_id": c["id"], "signal_id": s}
+        for c in raw_cases for s in set(c["signal_ids"])
     ])
 
     duration = time.monotonic() - start
@@ -83,7 +120,7 @@ def run_analysis(db: Session) -> dict:
         priority_distribution[c["priority"]] += 1
 
     db.add(AnalysisRun(
-        run_at=datetime.now(timezone.utc),
+        run_at=analyzed_at,
         signals_detected=len(raw_signals),
         cases_created=len(raw_cases),
         duration_seconds=duration,

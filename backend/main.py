@@ -7,7 +7,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import analyze, cases, overview, tenders, vendors
-from database.db import Base, engine
 from models import orm  # noqa: F401  (registers models on Base.metadata)
 
 app = FastAPI(
@@ -27,11 +26,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def on_startup():
-    Base.metadata.create_all(bind=engine)
 
 
 @app.get("/api/health")

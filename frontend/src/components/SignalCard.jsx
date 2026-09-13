@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import EvidenceText from "./EvidenceText";
 import PriorityBadge from "./PriorityBadge";
 
 const SIGNAL_LABELS = {
@@ -16,8 +19,54 @@ const SIGNAL_DESCRIPTIONS = {
   COMPETITION_ANOMALY: "Flags tenders that drew far fewer bidders than comparable tenders.",
 };
 
+const WHY_IT_MATTERS = {
+  PRICE_DEVIATION: "The winning price differs materially from comparable procurement activity.",
+  WINNER_CONCENTRATION: "One vendor is winning a disproportionate share of comparable tenders.",
+  REPEATED_PARTICIPATION: "The same vendors keep appearing together across tenders, far more than a typical pair.",
+  BID_SIMILARITY: "Bid amounts from these vendors are unusually close, tender after tender.",
+  COMPETITION_ANOMALY: "This tender drew far fewer competing bids than comparable procurements.",
+};
+
+const METRIC_DEFS = {
+  PRICE_DEVIATION: [
+    { key: "observed_amount", label: "Observed Bid", format: "amount" },
+    { key: "peer_median_amount", label: "Peer Median", format: "amount" },
+    { key: "deviation_percent", label: "Deviation", format: "signed-percent" },
+  ],
+  WINNER_CONCENTRATION: [
+    { key: "tenders_won", label: "Tenders Won", format: "int" },
+    { key: "tenders_participated", label: "Tenders Participated", format: "int" },
+    { key: "win_rate_percent", label: "Win Rate", format: "percent" },
+  ],
+  REPEATED_PARTICIPATION: [
+    { key: "shared_tenders", label: "Shared Tenders", format: "int" },
+    { key: "overlap_ratio_percent", label: "Overlap Ratio", format: "percent" },
+    { key: "dataset_average_shared_tenders", label: "Dataset Average", format: "amount" },
+  ],
+  BID_SIMILARITY: [
+    { key: "shared_tenders", label: "Shared Tenders", format: "int" },
+    { key: "avg_difference_percent", label: "Avg Bid Difference", format: "percent" },
+    { key: "threshold_percent", label: "Threshold Used", format: "percent" },
+  ],
+  COMPETITION_ANOMALY: [
+    { key: "observed_bids", label: "Observed Bids", format: "int" },
+    { key: "peer_median_bids", label: "Peer Median Bids", format: "amount" },
+    { key: "difference_percent", label: "Difference", format: "signed-percent" },
+  ],
+};
+
+function formatMetric(value, format) {
+  if (value === null || value === undefined) return "—";
+  if (format === "percent") return `${value}%`;
+  if (format === "signed-percent") return `${value > 0 ? "+" : ""}${value}%`;
+  if (format === "amount") return typeof value === "number" ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value;
+  return value;
+}
+
 function EvidenceRecordTable({ records }) {
-  if (!records || records.length === 0) return null;
+  if (!records || records.length === 0) {
+    return <div className="empty-state" style={{ padding: "16px 0" }}>No additional evidence available.</div>;
+  }
   const columns = Array.from(
     records.reduce((set, r) => {
       Object.keys(r).forEach((k) => set.add(k));
@@ -52,6 +101,9 @@ function EvidenceRecordTable({ records }) {
 }
 
 export default function SignalCard({ signal }) {
+  const [showEvidence, setShowEvidence] = useState(false);
+  const metricDefs = METRIC_DEFS[signal.signal_type] || [];
+
   return (
     <div className="signal-card">
       <div className="signal-card-header">
@@ -61,39 +113,54 @@ export default function SignalCard({ signal }) {
           <span className="badge badge-type">evidence strength {signal.score.toFixed(2)}</span>
         </div>
       </div>
-      <div className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
+      <div className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
         {SIGNAL_DESCRIPTIONS[signal.signal_type]}
       </div>
-      <div className="signal-explanation">{signal.explanation}</div>
 
-      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 10 }}>
-        <div>
-          <div className="stat-label" style={{ marginBottom: 4 }}>Supporting tenders</div>
-          <div className="chip-row">
-            {signal.tender_ids.length ? (
-              signal.tender_ids.map((t) => (
-                <span key={t} className="mono badge badge-low">{t}</span>
-              ))
-            ) : (
-              <span className="muted">none</span>
-            )}
-          </div>
+      {metricDefs.length > 0 && (
+        <div className="metric-row">
+          {metricDefs.map((m) => (
+            <div key={m.key} className="metric-stat">
+              <div className="metric-stat-label">{m.label}</div>
+              <div className="metric-stat-value">{formatMetric(signal.metrics?.[m.key], m.format)}</div>
+            </div>
+          ))}
         </div>
-        <div>
-          <div className="stat-label" style={{ marginBottom: 4 }}>Supporting vendors</div>
-          <div className="chip-row">
-            {signal.vendor_ids.length ? (
-              signal.vendor_ids.map((v) => (
-                <span key={v} className="mono badge badge-low">{v}</span>
-              ))
-            ) : (
-              <span className="muted">none</span>
-            )}
-          </div>
-        </div>
+      )}
+
+      <p className="signal-explanation">
+        <EvidenceText text={signal.explanation} />
+      </p>
+
+      <div className="why-it-matters">
+        <strong>Why it matters: </strong>
+        {WHY_IT_MATTERS[signal.signal_type] || "This pattern differs from comparable procurement activity."}
       </div>
 
-      <EvidenceRecordTable records={signal.evidence} />
+      <div className="signal-card-footer">
+        <div className="chip-row">
+          {signal.tender_ids.length > 0 && (
+            <span className="muted" style={{ fontSize: 12 }}>
+              Evidence source:{" "}
+              {signal.tender_ids.map((t, i) => (
+                <span key={t}>
+                  {i > 0 && ", "}
+                  <Link to={`/tenders/${t}`} className="evidence-id">{t}</Link>
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+        <button type="button" className="btn-link" onClick={() => setShowEvidence((v) => !v)}>
+          {showEvidence ? "Hide evidence" : "View evidence"}
+        </button>
+      </div>
+
+      {showEvidence && (
+        <div style={{ marginTop: 10 }}>
+          <EvidenceRecordTable records={signal.evidence} />
+        </div>
+      )}
     </div>
   );
 }
