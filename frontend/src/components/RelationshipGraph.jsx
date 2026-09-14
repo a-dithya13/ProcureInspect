@@ -82,6 +82,9 @@ export default function RelationshipGraph({ graph }) {
     cy.on("tap", "node[type = \"vendor\"]", (evt) => {
       navigate(`/vendors/${evt.target.id()}`);
     });
+    cy.on("tap", "node[type = \"tender\"]", (evt) => {
+      navigate(`/tenders/${evt.target.id()}`);
+    });
 
     return () => cy.destroy();
   }, [graph, navigate]);
@@ -112,7 +115,7 @@ export default function RelationshipGraph({ graph }) {
         </span>
       </div>
       <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-        Click a vendor node to open its profile.
+        Click a vendor or tender node to open its profile.
       </div>
     </div>
   );

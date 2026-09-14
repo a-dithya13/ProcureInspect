@@ -79,7 +79,7 @@ export default function VendorDetail() {
             <tbody>
               {bids.map((b) => (
                 <tr key={b.id}>
-                  <td className="mono">{b.tender_id}</td>
+                  <td><Link to={`/tenders/${b.tender_id}`} className="evidence-id">{b.tender_id}</Link></td>
                   <td>{b.amount.toLocaleString()}</td>
                   <td>{b.rank}</td>
                   <td>

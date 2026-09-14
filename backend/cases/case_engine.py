@@ -8,7 +8,7 @@ disconnected alerts.
 
 Priority score is a transparent, deterministic function of the contributing
 signals' severities and the amount of convergence between them. It is an
-"Investigation Priority" -- how much this warrants a human look -- and it is
+"Investigation Score" -- how much this warrants a human look -- and it is
 explicitly NOT a probability of wrongdoing.
 """
 import networkx as nx
@@ -17,16 +17,43 @@ SEVERITY_WEIGHT = {"LOW": 1.0, "MEDIUM": 2.0, "HIGH": 3.0}
 CONVERGENCE_BONUS = 0.5  # extra weight per additional converging signal
 NORMALIZATION_DIVISOR = 6.0  # tuned so 2+ converging HIGH signals reach ~100
 
+# Deterministic priority thresholds. A case also escalates on signal COUNT
+# (not score alone) because 3+ independently-detected signals converging on
+# the same entities is itself meaningful, even if each one's individual
+# evidence strength is moderate.
+HIGH_SCORE_THRESHOLD = 70
+MEDIUM_SCORE_THRESHOLD = 40
+HIGH_SIGNAL_COUNT = 3
+MEDIUM_SIGNAL_COUNT = 2
 
-def _priority_label(score_100: float, signal_count: int) -> str:
-    if score_100 >= 70 or signal_count >= 3:
+
+def calculate_investigation_score(group: list[dict]) -> float:
+    """0-100 Investigation Score for a group of converging signals.
+
+    NOT a fraud/corruption probability -- a transparent weighted sum of each
+    signal's severity x evidence-strength, plus a small bonus per additional
+    converging signal, normalized to a 0-100 scale.
+    """
+    raw = sum(SEVERITY_WEIGHT[s["severity"]] * s["score"] for s in group)
+    raw += CONVERGENCE_BONUS * (len(group) - 1)
+    return round(min(1.0, raw / NORMALIZATION_DIVISOR) * 100, 1)
+
+
+def classify_priority(score: float, signal_count: int) -> str:
+    """Deterministic HIGH/MEDIUM/LOW classification.
+
+    Score >= 70 (or 3+ converging signals) -> HIGH
+    Score >= 40 (or 2 converging signals)   -> MEDIUM
+    otherwise                               -> LOW
+    """
+    if score >= HIGH_SCORE_THRESHOLD or signal_count >= HIGH_SIGNAL_COUNT:
         return "HIGH"
-    if score_100 >= 40 or signal_count == 2:
+    if score >= MEDIUM_SCORE_THRESHOLD or signal_count >= MEDIUM_SIGNAL_COUNT:
         return "MEDIUM"
     return "LOW"
 
 
-def _recommendation_for_signal(signal: dict) -> str:
+def _investigation_focus_for_signal(signal: dict) -> str:
     t = signal["signal_type"]
     tender_ids = ", ".join(signal["tender_ids"]) if signal["tender_ids"] else "the flagged tender(s)"
     vendor_ids = signal["vendor_ids"]
@@ -56,10 +83,33 @@ def _recommendation_for_signal(signal: dict) -> str:
         )
     if t == "COMPETITION_ANOMALY":
         return (
-            f"Confirm outreach and eligibility criteria for tender {tender_ids}, "
-            f"which drew fewer bidders than comparable tenders."
+            f"Check whether the limited number of bidders for tender {tender_ids} is "
+            f"explained by market specialization or tender requirements."
         )
     return f"Review the {t} signal for tender(s) {tender_ids}."
+
+
+def generate_investigation_focus(group: list[dict]) -> list[str]:
+    """Deterministic, non-accusatory next-step checklist for a case.
+
+    One entry per contributing signal. Tells a human investigator what to
+    verify -- it is never phrased as a conclusion.
+    """
+    return [_investigation_focus_for_signal(s) for s in group]
+
+
+def aggregate_entity_signals(vendor_ids: list[str], tender_ids: list[str], signal_types: list[str]) -> dict:
+    """Small deterministic rollup used for the case's "why flagged" summary.
+
+    Kept separate from calculate_investigation_score/classify_priority so
+    callers needing just a plain-language convergence summary (not a score)
+    can reuse it without recomputing anything.
+    """
+    return {
+        "vendor_count": len(vendor_ids),
+        "tender_count": len(tender_ids),
+        "signal_type_count": len(signal_types),
+    }
 
 
 def build_cases(signals: list[dict]) -> list[dict]:
@@ -94,10 +144,8 @@ def build_cases(signals: list[dict]) -> list[dict]:
         signal_ids = [s["id"] for s in group]
         signal_types = sorted({s["signal_type"] for s in group})
 
-        raw = sum(SEVERITY_WEIGHT[s["severity"]] * s["score"] for s in group)
-        raw += CONVERGENCE_BONUS * (len(group) - 1)
-        score_100 = round(min(1.0, raw / NORMALIZATION_DIVISOR) * 100, 1)
-        priority = _priority_label(score_100, len(group))
+        score_100 = calculate_investigation_score(group)
+        priority = classify_priority(score_100, len(group))
 
         explanation = (
             f"{len(group)} converging investigation signal(s) "
@@ -115,8 +163,6 @@ def build_cases(signals: list[dict]) -> list[dict]:
             for s in group
         ]
 
-        recommended_investigation = " ".join(_recommendation_for_signal(s) for s in group)
-
         cases.append({
             "priority": priority,
             "score": score_100,
@@ -126,7 +172,7 @@ def build_cases(signals: list[dict]) -> list[dict]:
             "signal_ids": signal_ids,
             "explanation": explanation,
             "evidence": evidence,
-            "recommended_investigation": recommended_investigation,
+            "recommended_investigation": generate_investigation_focus(group),
         })
 
     cases.sort(key=lambda c: c["score"], reverse=True)

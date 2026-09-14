@@ -101,6 +101,13 @@ def detect(tenders_df: pd.DataFrame, awards_df: pd.DataFrame) -> list[dict]:
                 "tender_ids": [row["tender_id"]],
                 "vendor_ids": [row["vendor_id"]],
                 "evidence": evidence,
+                "metrics": {
+                    "observed_amount": round(float(row["amount"]), 2),
+                    "peer_median_amount": round(float(peer_median_amount), 2),
+                    "deviation_percent": round(pct_dev * 100, 1),
+                    "direction": direction,
+                    "peer_count": len(peers),
+                },
             })
 
     return signals

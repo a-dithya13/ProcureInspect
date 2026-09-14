@@ -8,3 +8,4 @@ numpy==2.2.1
 scikit-learn==1.6.0
 networkx==3.4.2
 python-dotenv==1.0.1
+alembic==1.14.0

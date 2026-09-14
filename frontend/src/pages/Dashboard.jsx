@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import CasesTable from "../components/CasesTable";
 import PriorityChart from "../components/PriorityChart";
 import StatCard from "../components/StatCard";
@@ -75,24 +76,35 @@ export default function Dashboard() {
       )}
 
       <div className="stat-grid">
-        <StatCard label="Total Tenders" value={overview.total_tenders} />
-        <StatCard label="Total Vendors" value={overview.total_vendors} />
-        <StatCard label="Total Bids" value={overview.total_bids} />
-        <StatCard label="Investigation Signals" value={overview.total_signals} />
         <StatCard label="Investigation Cases" value={overview.total_cases} />
+        <StatCard label="High Priority" value={overview.high_priority_cases} />
+        <StatCard label="Active Signals" value={overview.total_signals} />
+        <StatCard label="Vendors Under Review" value={overview.vendors_under_review} />
+      </div>
+
+      <div className="dataset-line">
+        <span><strong>{overview.total_tenders}</strong> tenders</span>
+        <span><strong>{overview.total_vendors}</strong> vendors</span>
+        <span><strong>{overview.total_bids}</strong> bids</span>
+        <span><strong>{overview.total_awards}</strong> awards</span>
       </div>
 
       <div className="grid-2">
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Investigation Cases</h2>
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              {overview.last_analysis_run
-                ? `Last analysis: ${new Date(overview.last_analysis_run).toLocaleString()}`
-                : "No analysis run yet"}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <span className="muted" style={{ fontSize: 12.5 }}>
+                {overview.last_analysis_run
+                  ? `Last analysis: ${new Date(overview.last_analysis_run).toLocaleString()}`
+                  : "No analysis run yet"}
+              </span>
+              <Link to="/cases" className="back-link" style={{ margin: 0 }}>
+                View all cases &rarr;
+              </Link>
+            </div>
           </div>
-          <CasesTable cases={cases} />
+          <CasesTable cases={cases} limit={8} />
         </div>
 
         <div className="card">

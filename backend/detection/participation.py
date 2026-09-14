@@ -81,6 +81,11 @@ def detect(tenders_df: pd.DataFrame, bids_df: pd.DataFrame) -> list[dict]:
             "tender_ids": shared,
             "vendor_ids": [v1, v2],
             "evidence": evidence,
+            "metrics": {
+                "shared_tenders": len(shared),
+                "overlap_ratio_percent": round(ratio * 100, 1),
+                "dataset_average_shared_tenders": round(mean, 1),
+            },
         })
 
     return signals
